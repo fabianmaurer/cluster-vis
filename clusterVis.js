@@ -61,19 +61,26 @@ function doStep() {
             // cutoff at 20
         velocities[n][0] = Math.max(0, velocities[n][0] - 20)
         velocities[n][1] = Math.max(0, velocities[n][1] - 20)
-            //normalizeVelocities()
+        normalizeVelocities()
         positions[n][0] += velocities[n][0] * scale
         positions[n][1] += velocities[n][1] * scale
     }
 }
 
-// function normalizeVelocities(){
-//     xSum=0;
-//     ySum=0;
-//     for (let n = 0; n < velocities.length; n++) {
-//         xSum+=
-//     }
-// }
+function normalizeVelocities() {
+    xSum = 0;
+    ySum = 0;
+    for (let n = 0; n < velocities.length; n++) {
+        xSum += velocities[n][0]
+        ySum += velocities[n][1]
+    }
+    xSum /= velocities.length
+    ySum /= velocities.length
+    for (let n = 0; n < velocities.length; n++) {
+        velocities[n][0] -= xSum
+        velocities[n][1] -= ySum
+    }
+}
 
 function dist(x1, y1, x2, y2) {
     return Math.hypot(x2 - x1, y2 - y1)
