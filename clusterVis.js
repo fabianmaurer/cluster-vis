@@ -97,7 +97,7 @@ function drawData() {
         ctx.beginPath();
         ctx.moveTo(positions[i][0], positions[i][1])
         ctx.arc(positions[i][0], positions[i][1], 4, 0, Math.PI * 2)
-        ctx.fillStyle = i < 15 ? "#a00" : i < 30 ? '#0a0' : '#00a';
+        ctx.fillStyle = i < 30 ? "#a00" : i < 60 ? '#0a0' : '#00a';
         ctx.fill()
 
         //ctx.stroke();
