@@ -8,11 +8,11 @@ can.height = h;
 let ctx = can.getContext('2d');
 let c = 0
 const maxElements = 900
-scale = 1
+scale = 10
 dragMult = 0
 const inertia = false
 const cutoff = 0
-const normalize = false
+const normalize = true
 
 
 init();
@@ -81,7 +81,6 @@ function calcForce(index, inertia) {
 
 function doStep() {
     let section = velocities.slice(0, maxElements).map(i => i.slice(0, maxElements))
-    console.log(section)
 
     debugger;
     for (let n = 0; n < Math.min(velocities.length, maxElements); n++) {
@@ -104,8 +103,8 @@ function normalizeVelocities() {
         ySum += Math.abs(velocities[n][1])
     }
     total = (xSum + ySum) * 0.0001
-    console.log(velocities)
-    console.log(total)
+    total = Math.max(maxElements * 100, total)
+
     for (let n = 0; n < velocities.length; n++) {
         velocities[n][0] /= total
         velocities[n][1] /= total
