@@ -19,7 +19,7 @@ let distanceScale = 20
 let scale = 1
 let strokeEnabled = false;
 let stop = false;
-let distanceMatrix = distanceMatrix_absolute
+let distanceMatrix = distanceMatrix_ternary
 
 $(document).ready(function() {
     $('#clusters').bind('mousewheel', function(e) {
@@ -38,7 +38,7 @@ $(document).ready(function() {
 });
 
 bindButtons();
-init();
+loadPreset(1)
 
 function init() {
     stop = false;
@@ -56,10 +56,10 @@ function init() {
 }
 
 function loadPreset(i) {
-    const third = Math.floor(positions.length / 3)
+    const third = Math.floor(distanceMatrix.length / 3)
     if (i == 0) {
         startIndex = 0
-        maxElements = positions.length
+        maxElements = distanceMatrix.length
     }
     if (i == 1) {
         startIndex = 0
