@@ -8,18 +8,26 @@ can.height = h;
 let ctx = can.getContext('2d');
 let c = 0
 let startIndex = 0
-let maxElements = 900
 dragMult = 0
 const inertia = false
 const cutoff = 0
 const normalize = true
 const repell = true
 let uniform = false
-let distanceScale = 20
+let distanceScale = 16
 let scale = 1
 let strokeEnabled = false;
 let stop = false;
-let distanceMatrix = distanceMatrix_ternary
+let distanceMatrix = distanceMatrix_sum
+let visibleElements = 90
+let totalVisibleElements = visibleElements
+let tensions = []
+let enabled = []
+let showAngry = true
+let showHappy = true
+let showNeutral = true
+let zoomcount = 0
+
 
 $(document).ready(function() {
     $('#clusters').bind('mousewheel', function(e) {
@@ -29,20 +37,22 @@ $(document).ready(function() {
             console.log(e.originalEvent)
             let zoomfactor = 1.2
             ctx.transform(zoomfactor, 0, 0, zoomfactor, -(zoomfactor - 1) * x, -(zoomfactor - 1) * y)
+            zoomcount++;
         } else {
+            if (zoomcount == 0) return;
             let zoomfactor = 1 / 1.2
             ctx.transform(zoomfactor, 0, 0, zoomfactor, -(zoomfactor - 1) * x, -(zoomfactor - 1) * y)
-
+            zoomcount--;
         }
     });
 });
 
 bindButtons();
-loadPreset(1)
+init();
 
 function init() {
+    refreshEnabled()
     stop = false;
-    if (uniform) generateUniformState(maxElements)
 
     positions = new Array(distanceMatrix.length)
     for (let i = 0; i < positions.length; i++) {
@@ -50,30 +60,34 @@ function init() {
         velocities[i] = [0, 0]
     }
     if (!normalize) {
-        scale = 0.05 / maxElements
+        scale = 0.05 / totalVisibleElements
     }
+
     loop()
 }
 
-function loadPreset(i) {
-    const third = Math.floor(distanceMatrix.length / 3)
-    if (i == 0) {
-        startIndex = 0
-        maxElements = distanceMatrix.length
+function refreshEnabled() {
+    let third = visibleElements / 3
+    totalVisibleElements = 0
+    enabled = []
+    if (showAngry) {
+        for (let i = 0; i < third; i++) {
+            enabled[i] = true
+        }
+        totalVisibleElements += third
     }
-    if (i == 1) {
-        startIndex = 0
-        maxElements = third
+    if (showHappy) {
+        for (let i = 300; i < 300 + third; i++) {
+            enabled[i] = true
+        }
+        totalVisibleElements += third
     }
-    if (i == 2) {
-        startIndex = third
-        maxElements = third * 2
+    if (showNeutral) {
+        for (let i = 600; i < 600 + third; i++) {
+            enabled[i] = true
+        }
+        totalVisibleElements += third
     }
-    if (i == 3) {
-        startIndex = third * 2
-        maxElements = third * 3
-    }
-    init();
 }
 
 function generateUniformState(n) {
@@ -104,7 +118,8 @@ function loop() {
             velocities[i] = [0, 0]
         }
     }
-    for (let index = startIndex; index < Math.min(positions.length, maxElements) - 1; index++) {
+    for (let index = startIndex; index < positions.length - 1; index++) {
+        if (!enabled[index]) continue;
         calcForce(index)
     }
     if (normalize) {
@@ -117,13 +132,14 @@ function loop() {
 }
 
 function calcForce(index, inertia) {
-    for (let n = index + 1; n < Math.min(distanceMatrix.length, maxElements); n++) {
+    for (let n = index + 1; n < distanceMatrix.length; n++) {
+        if (!enabled[n]) continue;
         if (n == index) continue;
-        targetDist = Math.max(0.2, Math.abs(distanceMatrix[n][index])) * distanceScale
+        targetDist = Math.max(2, Math.abs(distanceMatrix[n][index]) * distanceScale)
         xDist = positions[index][0] - positions[n][0]
         yDist = positions[index][1] - positions[n][1]
         actualDist = dist(positions[index][0], positions[index][1], positions[n][0], positions[n][1])
-        totalForce = (actualDist - targetDist) * Math.abs(actualDist - targetDist) / 100
+        totalForce = actualDist - targetDist
             // neutralize repelling forces
         if (!repell && (actualDist < targetDist)) totalForce *= 0;
         // if (actualDist < targetDist) {
@@ -142,7 +158,8 @@ function calcForce(index, inertia) {
 function doStep() {
 
     //debugger;
-    for (let n = startIndex; n < Math.min(velocities.length, maxElements); n++) {
+    for (let n = startIndex; n < velocities.length; n++) {
+        if (!enabled[n]) continue;
         velocities[n][0] -= drag(velocities[n][0])
         velocities[n][1] -= drag(velocities[n][1])
             // cutoff 
@@ -158,11 +175,12 @@ function normalizeVelocities() {
     xSum = 0;
     ySum = 0;
     for (let n = 0; n < velocities.length; n++) {
+        if (!enabled[n]) continue;
         xSum += Math.abs(velocities[n][0])
         ySum += Math.abs(velocities[n][1])
     }
     total = (xSum + ySum) * 0.0001
-    total = Math.max(Math.pow(maxElements, 1.3), total)
+    total = Math.max(Math.pow(totalVisibleElements, 1.3), total)
 
     for (let n = 0; n < velocities.length; n++) {
         velocities[n][0] /= total
@@ -183,31 +201,20 @@ function drawData(stroke) {
     ctx.clearRect(0, 0, w, h)
     ctx.strokeStyle = "#000"
     const third = Math.floor(positions.length / 3)
-    for (let i = startIndex; i < Math.min(positions.length, maxElements); i++) {
-        ctx.beginPath();
-        ctx.moveTo(positions[i][0], positions[i][1])
-        ctx.arc(positions[i][0], positions[i][1], 4, 0, Math.PI * 2)
-            //ctx.fillStyle = i < third ? "#a00" : i < third * 2 ? '#0a0' : '#00a';
-        if (i < third) {
-            ctx.fillStyle = "rgba(250,50,50,0.5)"
-        } else if (i < third * 2) {
-            ctx.fillStyle = "rgba(50,250,50,0.5)"
-        } else {
-            ctx.fillStyle = "rgba(50,50,250,0.5)"
-        }
-        //ctx.fillStyle = "rgba(" + i < third ? 150 : 0 + "," + i < third * 2 ? 150 : 0 + "," + i < third * 3 ? 150 : 0 + ",0.5)"
-        ctx.fill()
-
-        //ctx.stroke();
-        ctx.closePath()
-    }
 
     tension = 0
     tension_abs = 0
     cnt = 0
-    for (let i = startIndex; i < Math.min(positions.length, maxElements) - 1; i++) {
-        for (let j = i + 1; j < Math.min(positions.length, maxElements); j++) {
-            targetDist = Math.max(0.2, Math.abs(distanceMatrix[i][j])) * distanceScale
+    for (let i = 0; i < tensions.length; i++) {
+        tensions[i] = 0
+    }
+    for (let i = startIndex; i < positions.length - 1; i++) {
+        if (!enabled[i])
+            continue;
+        for (let j = i + 1; j < positions.length; j++) {
+            if (!enabled[j])
+                continue;
+            targetDist = Math.max(2, Math.abs(distanceMatrix[i][j]) * distanceScale)
             xDist = positions[i][0] - positions[j][0]
             yDist = positions[i][1] - positions[j][1]
             actualDist = dist(positions[i][0], positions[i][1], positions[j][0], positions[j][1])
@@ -215,6 +222,8 @@ function drawData(stroke) {
             tension_abs += Math.abs(totalForce)
             const _tension = Math.max(actualDist / targetDist, targetDist / actualDist) - 1
             tension += _tension
+            tensions[i] += _tension / totalVisibleElements
+            tensions[j] += _tension / totalVisibleElements
             cnt++;
             if (stroke) {
                 ctx.beginPath();
@@ -232,6 +241,27 @@ function drawData(stroke) {
         }
     }
 
+    for (let i = startIndex; i < positions.length; i++) {
+        if (!enabled[i]) continue;
+        ctx.beginPath();
+        //ctx.fillStyle = i < third ? "#a00" : i < third * 2 ? '#0a0' : '#00a';
+        opacity = Math.max(Math.min(1, 0.5 / tensions[i]), 0.01)
+        if (i < third) {
+            ctx.fillStyle = "rgba(200,0,0," + opacity + ")"
+        } else if (i < third * 2) {
+            ctx.fillStyle = "rgba(0,200,0," + opacity + ")"
+        } else {
+            ctx.fillStyle = "rgba(0,0,200," + opacity + ")"
+        }
+        ctx.moveTo(positions[i][0], positions[i][1])
+        ctx.arc(positions[i][0], positions[i][1], 6 * opacity, 0, Math.PI * 2)
+            //ctx.fillStyle = "rgba(" + i < third ? 150 : 0 + "," + i < third * 2 ? 150 : 0 + "," + i < third * 3 ? 150 : 0 + ",0.5)"
+        ctx.fill()
+
+        //ctx.stroke();
+        ctx.closePath()
+    }
+
     tension /= cnt
     tension_abs /= cnt
     $('#tension').html('Avg. tension: ' + Math.round(tension * 100) + '% / absolute: ' + Math.round(tension_abs))
@@ -241,57 +271,73 @@ function drawData(stroke) {
 }
 
 function bindButtons() {
-    let buttons = $('.buttonbar').children();
-    for (let i = 0; i < buttons.length; i++) {
-        $(buttons[i]).click(function(e) {
-            $('.buttonbar').find('.active').removeClass('active');
-            $(e.currentTarget).addClass('active')
-            console.log(1)
-            stop = true;
-            requestAnimationFrame(() => loadPreset(i));
-        })
-    }
-    buttons3 = $('.buttonbar3').children();
-    for (let i = 0; i < buttons3.length; i++) {
-        $(buttons3[i]).click(function(e) {
-            console.log(3)
-            $('.buttonbar3').find('.active').removeClass('active');
-            $(e.currentTarget).addClass('active')
-            if (i == 0) {
-                distanceMatrix = distanceMatrix_absolute
-            }
+    let buttons1 = $('.buttonbar').children();
+    for (let i = 0; i < buttons1.length; i++) {
+        $(buttons1[i]).click(function(e) {
+
+            $(e.currentTarget).toggleClass('active')
             if (i == 1) {
-                distanceMatrix = distanceMatrix_deriv
+                showAngry = !showAngry
             }
             if (i == 2) {
-                distanceMatrix = distanceMatrix_ternary
+                showHappy = !showHappy
+            }
+            if (i == 3) {
+                showNeutral = !showNeutral
+            }
+            console.log(showAngry)
+            requestAnimationFrame(() => refreshEnabled());
+        })
+    }
+    let buttons2 = $('.buttonbar2').children();
+    for (let i = 0; i < buttons2.length; i++) {
+        $(buttons2[i]).click(function(e) {
+            $('.buttonbar2').find('.active').removeClass('active');
+            $(e.currentTarget).addClass('active')
+            if (i == 1) {
+                distanceMatrix = distanceMatrix_sum
+            }
+            if (i == 2) {
+                distanceMatrix = distanceMatrix_direct
+            }
+            if (i == 3) {
+                distanceMatrix = distanceMatrix_deriv
             }
             stop = true;
             requestAnimationFrame(() => init());
         })
     }
-    $('.buttonbar2').children().first().click(function(e) {
-        uniform = true;
-        $('.buttonbar2').find('.active').removeClass('active');
-        $(e.currentTarget).addClass('active')
-        requestAnimationFrame(() => init());
-    })
-    $('.buttonbar2').children().last().click(function(e) {
-            uniform = false;
-            $('.buttonbar2').find('.active').removeClass('active');
+    let buttons3 = $('.buttonbar3').children();
+    for (let i = 0; i < buttons3.length; i++) {
+        $(buttons3[i]).click(function(e) {
+            $('.buttonbar3').find('.active').removeClass('active');
             $(e.currentTarget).addClass('active')
-            requestAnimationFrame(() => init());
+            if (i == 1) {
+                scale = 1
+            }
+            if (i == 2) {
+                scale = 2
+            }
+            if (i == 3) {
+                scale = 4
+            }
         })
-        // let trails = $('.buttonbar3').children();
-        // for (let i = 0; i < trails.length; i++) {
-        //     $(trails[i]).click(function (e) {
-        //         $('.buttonbar3').find('.active').removeClass('active');
-        //         $(e.currentTarget).addClass('active')
-        //         trailMode(i);
-        //     })
-        // }
-    $('.buttonbar4').children().first().click(function() {
-        $('.buttonbar4').children().first().toggleClass('active');
-        strokeEnabled = !strokeEnabled;
-    })
+    }
+    let buttons4 = $('.buttonbar4').children();
+    for (let i = 0; i < buttons4.length; i++) {
+        $(buttons4[i]).click(function(e) {
+            $('.buttonbar4').find('.active').removeClass('active');
+            $(e.currentTarget).addClass('active')
+            if (i == 1) {
+                visibleElements = 900
+            }
+            if (i == 2) {
+                visibleElements = 300
+            }
+            if (i == 3) {
+                visibleElements = 90
+            }
+            requestAnimationFrame(() => refreshEnabled());
+        })
+    }
 }

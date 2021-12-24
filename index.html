@@ -6,50 +6,68 @@
 </div>
 <canvas id="clusters"></canvas>
 <div class="buttonbar">
-    <button class="button 
-    ">
-        all
-    </button>
+    <div class="label">
+        Show/hide
+    </div>
     <button class="button active">
         angry
     </button>
-    <button class="button">
+    <button class="button active">
         happy
     </button>
-    <button class="button">
+    <button class="button active">
         neutral
     </button>
 </div>
 <div class="buttonbar2">
-    <button class="button">
-            random
-        </button>
+    <div class="label">
+        Dataset
+    </div>
     <button class="button active">
-            static
+            composite
+        </button>
+    <button class="button">
+            direct
+        </button>
+    <button class="button">
+            derivative
         </button>
 </div>
 <div class="buttonbar3">
-    <button class="button">
-            absolute
-        </button>
-    <button class="button">
-            deriv
-        </button>
+    <div class="label">
+        Speed
+    </div>
     <button class="button active">
-            ternary
+            1x
+        </button>
+    <button class="button">
+            2x
+        </button>
+    <button class="button">
+            4x
         </button>
 </div>
 <div class="buttonbar4">
+    <div class="label">
+        # of elements
+    </div>
     <button class="button">
-        tension lines
+        900
+    </button>
+    <button class="button">
+        300
+    </button>
+    <button class="button active">
+        90
     </button>
 </div>
 
 
 <script src="https://code.jquery.com/jquery-3.2.1.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4=" crossorigin="anonymous"></script>
-<script type="text/javascript" src="distances900_ternary.js"></script>
-<script type="text/javascript" src="distances900_deriv.js"></script>
-<script type="text/javascript" src="distances900.js"></script>
+<script type="text/javascript" src="distances.js"></script>
+<script type="text/javascript" src="distances_direct.js"></script>
+<script type="text/javascript" src="distances_deriv.js"></script>
+
 <script type="text/javascript" src="clusterVis.js"></script>
 
 </HTML>
