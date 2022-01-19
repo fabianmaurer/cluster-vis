@@ -1,3 +1,18 @@
+/**
+ * This file contains all functinal code of the cluster and distances visualization tool
+ * It can be open by simply opening index.html in a web browser
+ * This file is only scarcely commented since it is not the main part of the thesis
+ * Nonetheless, here is a brief outline of how this works:
+ * 
+ * Both functional and visual code is all native javascript aside from jQuery for convenient button mapping
+ * HTML5 canvas was used as a display port
+ * The screen is redrawn on a per-frame basis and all physics calculations happen once per frame
+ * -> higher framerate = faster simulation and convergence
+ * data is read from .js files which are included on the CD
+ */
+
+
+
 positions = []
 velocities = []
 let can = document.getElementById('clusters');
@@ -6,6 +21,7 @@ let h = $(window).height();
 can.width = w;
 can.height = h;
 let ctx = can.getContext('2d');
+ctx.textAlign = "center"
 let c = 0
 let startIndex = 0
 dragMult = 0
@@ -15,10 +31,10 @@ const normalize = true
 const repell = true
 let uniform = false
 let distanceScale = 16
-let scale = 1
+let scale = 4
 let strokeEnabled = false;
 let stop = false;
-let distanceMatrix = distanceMatrix_sum
+let distanceMatrix = distanceMatrix_test
 let visibleElements = 90
 let totalVisibleElements = visibleElements
 let tensions = []
@@ -27,6 +43,10 @@ let showAngry = true
 let showHappy = true
 let showNeutral = true
 let zoomcount = 0
+let exemplars = exemplars_all_test
+let clusters = clusters_all_test
+let removeWorst = false
+let removeAmount = 5
 
 
 $(document).ready(function() {
@@ -34,7 +54,6 @@ $(document).ready(function() {
         x = e.originalEvent.clientX
         y = e.originalEvent.clientY
         if (e.originalEvent.wheelDelta > 0) {
-            console.log(e.originalEvent)
             let zoomfactor = 1.2
             ctx.transform(zoomfactor, 0, 0, zoomfactor, -(zoomfactor - 1) * x, -(zoomfactor - 1) * y)
             zoomcount++;
@@ -49,6 +68,24 @@ $(document).ready(function() {
 
 bindButtons();
 init();
+
+function computeClusters() {
+    clusterObjectsAngry = []
+    for (let i = 0; i < clusters_angry_test.length; i++) {
+        clusterObjectsAngry.push({ exemplar: exemplars_angry_test[i], cluster: clusters_angry_test[i] })
+    }
+    clusterObjectsAngry.sort((c1, c2) => c2.cluster.length - c1.cluster.length)
+    clusterObjectsHappy = []
+    for (let i = 0; i < clusters_happy_test.length; i++) {
+        clusterObjectsHappy.push({ exemplar: exemplars_happy_test[i], cluster: clusters_happy_test[i] })
+    }
+    clusterObjectsHappy.sort((c1, c2) => c2.cluster.length - c1.cluster.length)
+    clusterObjectsNeutral = []
+    for (let i = 0; i < clusters_neutral_test.length; i++) {
+        clusterObjectsNeutral.push({ exemplar: exemplars_neutral_test[i], cluster: clusters_neutral_test[i] })
+    }
+    clusterObjectsNeutral.sort((c1, c2) => c2.cluster.length - c1.cluster.length)
+}
 
 function init() {
     refreshEnabled()
@@ -70,24 +107,28 @@ function refreshEnabled() {
     let third = visibleElements / 3
     totalVisibleElements = 0
     enabled = []
+    offset = 0
     if (showAngry) {
-        for (let i = 0; i < third; i++) {
+        for (let i = offset; i < offset + third; i++) {
             enabled[i] = true
         }
         totalVisibleElements += third
     }
     if (showHappy) {
-        for (let i = 300; i < 300 + third; i++) {
+        for (let i = offset + 300; i < offset + 300 + third; i++) {
             enabled[i] = true
         }
         totalVisibleElements += third
     }
     if (showNeutral) {
-        for (let i = 600; i < 600 + third; i++) {
+        for (let i = offset + 600; i < offset + 600 + third; i++) {
             enabled[i] = true
         }
         totalVisibleElements += third
     }
+    if (enabled.length < 899)
+        enabled[899] = false
+        //shuffle(enabled)
 }
 
 function generateUniformState(n) {
@@ -142,22 +183,17 @@ function calcForce(index, inertia) {
         totalForce = actualDist - targetDist
             // neutralize repelling forces
         if (!repell && (actualDist < targetDist)) totalForce *= 0;
-        // if (actualDist < targetDist) {
-        //     totalForce *= 0.5
-        // }
         xForce = -totalForce * xDist / actualDist
         yForce = -totalForce * yDist / actualDist
         velocities[index][0] += xForce
         velocities[index][1] += yForce
         velocities[n][0] -= xForce
         velocities[n][1] -= yForce
-            //debugger
     }
 }
 
 function doStep() {
 
-    //debugger;
     for (let n = startIndex; n < velocities.length; n++) {
         if (!enabled[n]) continue;
         velocities[n][0] -= drag(velocities[n][0])
@@ -193,7 +229,6 @@ function dist(x1, y1, x2, y2) {
 }
 
 function drag(v) {
-    //return 0
     return Math.min(dragMult * 0.1 * v, dragMult * 0.02 * Math.pow(v, 2))
 }
 
@@ -208,12 +243,17 @@ function drawData(stroke) {
     for (let i = 0; i < tensions.length; i++) {
         tensions[i] = 0
     }
+    if (stroke) {
+        ctx.strokeStyle = "#666"
+        ctx.lineWidth = 1
+    }
     for (let i = startIndex; i < positions.length - 1; i++) {
         if (!enabled[i])
             continue;
         for (let j = i + 1; j < positions.length; j++) {
             if (!enabled[j])
                 continue;
+
             targetDist = Math.max(2, Math.abs(distanceMatrix[i][j]) * distanceScale)
             xDist = positions[i][0] - positions[j][0]
             yDist = positions[i][1] - positions[j][1]
@@ -225,26 +265,39 @@ function drawData(stroke) {
             tensions[i] += _tension / totalVisibleElements
             tensions[j] += _tension / totalVisibleElements
             cnt++;
-            if (stroke) {
-                ctx.beginPath();
 
-                const a = Math.sqrt(totalForce / 10000)
-                ctx.strokeStyle = "rgba(255, 255, 255," + _tension / 200 + " )"
-                ctx.lineWidth = Math.ceil(a * 3)
-                ctx.moveTo(positions[i][0], positions[i][1])
-                ctx.lineTo(positions[j][0], positions[j][1])
-
-                //ctx.fillText(Math.floor(actualDist) + '/' + targetDist, (positions[i][0] + positions[j][0]) / 2, (positions[i][1] + positions[j][1]) / 2)
-                ctx.stroke()
-                ctx.closePath()
-            }
         }
     }
 
+    if (stroke) {
+        ctx.beginPath()
+        for (let cluster of clusters) {
+            avgX = 0
+            avgY = 0
+            _cnt = 0
+            for (let i = 0; i < cluster.length; i++) {
+                if (!enabled[cluster[i]]) continue
+                avgX += positions[cluster[i]][0]
+                avgY += positions[cluster[i]][1]
+                _cnt++;
+            }
+            if (_cnt == 0) continue
+            avgX /= _cnt
+            avgY /= _cnt
+            for (let i = 0; i < cluster.length; i++) {
+                if (!enabled[cluster[i]]) continue
+                ctx.moveTo(positions[cluster[i]][0], positions[cluster[i]][1])
+                ctx.lineTo(avgX, avgY)
+            }
+        }
+        ctx.stroke()
+    }
+
+
     for (let i = startIndex; i < positions.length; i++) {
         if (!enabled[i]) continue;
+
         ctx.beginPath();
-        //ctx.fillStyle = i < third ? "#a00" : i < third * 2 ? '#0a0' : '#00a';
         opacity = Math.max(Math.min(1, 0.5 / tensions[i]), 0.01)
         if (i < third) {
             ctx.fillStyle = "rgba(200,0,0," + opacity + ")"
@@ -254,20 +307,70 @@ function drawData(stroke) {
             ctx.fillStyle = "rgba(0,0,200," + opacity + ")"
         }
         ctx.moveTo(positions[i][0], positions[i][1])
-        ctx.arc(positions[i][0], positions[i][1], 6 * opacity, 0, Math.PI * 2)
-            //ctx.fillStyle = "rgba(" + i < third ? 150 : 0 + "," + i < third * 2 ? 150 : 0 + "," + i < third * 3 ? 150 : 0 + ",0.5)"
+        ctx.arc(positions[i][0], positions[i][1], 4 * opacity, 0, Math.PI * 2)
         ctx.fill()
 
         //ctx.stroke();
         ctx.closePath()
+    }
+    if (stroke) {
+        ctx.fillStyle = "rgba(0,0,0,0.7)"
+        for (let cluster of clusters) {
+            avgX = 0
+            avgY = 0
+            _cnt = 0
+            for (let i = 0; i < cluster.length; i++) {
+                if (!enabled[cluster[i]]) continue
+                avgX += positions[cluster[i]][0]
+                avgY += positions[cluster[i]][1]
+                _cnt++
+            }
+            avgX /= _cnt
+            avgY /= _cnt
+            ctx.beginPath()
+            ctx.arc(avgX, avgY, 10, 0, Math.PI * 2)
+
+            ctx.fillText(clusters.indexOf(cluster), avgX, avgY)
+            ctx.fill()
+        }
     }
 
     tension /= cnt
     tension_abs /= cnt
     $('#tension').html('Avg. tension: ' + Math.round(tension * 100) + '% / absolute: ' + Math.round(tension_abs))
 
+    if (removeWorst) {
+        removeWorst = false;
+        removeWorstPoints(tensions)
+    }
+}
 
+function removeWorstPoints(tensions) {
+    for (let i = 0; i < removeAmount; i++) {
+        index = tensions.indexOf(Math.max(...tensions))
+        enabled[index] = false
+        tensions[index] = 0
+    }
+}
 
+function shuffle(array) {
+    let currentIndex = array.length,
+        randomIndex;
+
+    // While there remain elements to shuffle...
+    while (currentIndex != 0) {
+
+        // Pick a remaining element...
+        randomIndex = Math.floor(Math.random() * currentIndex);
+        currentIndex--;
+
+        // And swap it with the current element.
+        [array[currentIndex], array[randomIndex]] = [
+            array[randomIndex], array[currentIndex]
+        ];
+    }
+
+    return array;
 }
 
 function bindButtons() {
@@ -285,7 +388,6 @@ function bindButtons() {
             if (i == 3) {
                 showNeutral = !showNeutral
             }
-            console.log(showAngry)
             requestAnimationFrame(() => refreshEnabled());
         })
     }
@@ -295,16 +397,14 @@ function bindButtons() {
             $('.buttonbar2').find('.active').removeClass('active');
             $(e.currentTarget).addClass('active')
             if (i == 1) {
-                distanceMatrix = distanceMatrix_sum
+                distanceMatrix = distanceMatrix_test
             }
             if (i == 2) {
-                distanceMatrix = distanceMatrix_direct
+                distanceMatrix = distanceMatrix_direct_test.map(row => row.map((i) => i * 2))
             }
             if (i == 3) {
-                distanceMatrix = distanceMatrix_deriv
+                distanceMatrix = distanceMatrix_deriv_test.map(row => row.map((i) => i * 2))
             }
-            stop = true;
-            requestAnimationFrame(() => init());
         })
     }
     let buttons3 = $('.buttonbar3').children();
@@ -316,10 +416,10 @@ function bindButtons() {
                 scale = 1
             }
             if (i == 2) {
-                scale = 2
+                scale = 4
             }
             if (i == 3) {
-                scale = 4
+                scale = 8
             }
         })
     }
@@ -338,6 +438,49 @@ function bindButtons() {
                 visibleElements = 90
             }
             requestAnimationFrame(() => refreshEnabled());
+        })
+    }
+    let buttons7 = $('.buttonbar7').children();
+    for (let i = 0; i < buttons7.length; i++) {
+        $(buttons7[i]).click(function(e) {
+            strokeEnabled = !strokeEnabled
+            $('.buttonbar7').find('button').toggleClass('active');
+        })
+    }
+    let buttons5 = $('.buttonbar5').children();
+    for (let i = 0; i < buttons5.length; i++) {
+        $(buttons5[i]).click(function(e) {
+            $('.buttonbar5').find('.active').removeClass('active');
+            $(e.currentTarget).addClass('active')
+            if (i == 2) {
+                clusters = clusters_angry_test
+                exemplars = exemplars_angry_test
+            }
+            if (i == 3) {
+                clusters = clusters_happy_test.map(row => row.map((i) => i + 300))
+                exemplars = exemplars_happy_test.map(i => i + 300)
+            }
+            if (i == 4) {
+                clusters = clusters_neutral_test.map(row => row.map((i) => i + 600))
+                exemplars = exemplars_neutral_test.map(i => i + 600)
+            }
+        })
+    }
+
+    let buttons6 = $('.buttonbar6').children();
+    for (let i = 0; i < buttons6.length; i++) {
+        $(buttons6[i]).click(function(e) {
+            if (i == 1) {
+                removeAmount = 1
+                removeWorst = true
+            }
+            if (i == 2) {
+                removeAmount = 5
+                removeWorst = true
+            }
+            if (i == 3) {
+                refreshEnabled()
+            }
         })
     }
 }

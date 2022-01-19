@@ -71,3 +71,24 @@ body {
     right: 0;
     padding: 10px;
 }
+
+.buttonbar5 {
+    position: fixed;
+    top: 280px;
+    right: 0;
+    padding: 10px;
+}
+
+.buttonbar6 {
+    position: fixed;
+    top: 350px;
+    right: 0;
+    padding: 10px;
+}
+
+.buttonbar7 {
+    position: fixed;
+    top: 420px;
+    right: 0;
+    padding: 10px;
+}
